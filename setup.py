@@ -29,7 +29,7 @@ setuptools.setup(
         'sqlalchemy-migrate'
     ],
     tests_require=['pytest'],
-    scripts=['bin/dao-master', 'bin/dao-worker', 'bin/dao-manage'],
+    scripts=['bin/dao-master', 'bin/dao-worker'],
     entry_points={
         'console_scripts':
         ['dao-worker-agent = dao.control.worker.run_manager:run',
