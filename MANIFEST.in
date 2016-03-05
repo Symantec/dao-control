@@ -1,0 +1,5 @@
+exclude .gitignore
+exclude .gitreview
+include dao/control/db/migrate_repo/migrate.cfg
+global-exclude *.pyc
+
