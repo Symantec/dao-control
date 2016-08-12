@@ -48,8 +48,7 @@ class NeutronHelper(agent.DHCPHelper):
         :return:
         """
         # Init vlan tags supported by DHCP helpers
-        tftp_url = (CONF.dhcp.tftp or
-                    CONF.foreman.url.split('://')[-1].rsplit(':')[0])
+        tftp_url = CONF.dhcp.tftp
         ips = socket.gethostbyname_ex(tftp_url)[-1]
         if not ips:
             raise exceptions.DAOException('Unable to detect ip for {0}'.
@@ -85,7 +84,8 @@ class NeutronHelper(agent.DHCPHelper):
         if ports['ports']:
             port = ports['ports'][0]
             if port['device_owner'] not in ('', self.device_owner):
-                raise exceptions.DAOConflict('Port {0} in use'.format(ip))
+                raise exceptions.DAOConflict('Port {0} in use, {1}'.format(
+                    ip, port['device_owner']))
             old_ip = port['fixed_ips'][0]['ip_address']
             if ip and old_ip != ip:
                 raise exceptions.DAOConflict('Port is already created, IP '

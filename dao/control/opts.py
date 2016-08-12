@@ -35,6 +35,10 @@ conf_opts = [
     config.StrOpt('salt', 'master_host',
                   help='Salt master host IP or hostname.'),
 
+    config.StrOpt('master', 'url',
+                  default='http://localhost:5000/v1.0/',
+                  help='URL to communicate to master.'),
+
     config.StrOpt('worker', 'ipmi_login',
                   help='User name for server IPMI access.'),
 
@@ -77,6 +81,9 @@ conf_opts = [
     config.IntOpt('dhcp', 'last_ip_offset', default=-3,
                   help='Last ip in a subnet available for allocation'),
 
+    config.StrOpt('dhcp', 'agent_url',
+                  default='tcp://0.0.0.0:5557'),
+
 
     config.StrOpt('openstack', 'username',
                   help='DAO user name to authorize to OpenStack.'),
@@ -95,4 +102,7 @@ conf_opts = [
                   default='nova',
                   help='Openstack region name.'),
 
+    config.BoolOpt('openstack', 'insecure',
+                   default=False,
+                   help='Using insecure https connection'),
 ]

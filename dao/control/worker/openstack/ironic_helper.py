@@ -29,5 +29,6 @@ def get_client():
         os_region_name=CONF.openstack.region,
         os_username=CONF.openstack.username,
         os_password=CONF.openstack.password,
-        os_tenant_name=CONF.openstack.project)
+        os_tenant_name=CONF.openstack.project,
+        insecure=CONF.openstack.insecure)
     return ironic

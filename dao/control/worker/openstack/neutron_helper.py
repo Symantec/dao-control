@@ -28,7 +28,8 @@ def get_client():
         region_name=CONF.openstack.region,
         username=CONF.openstack.username,
         password=CONF.openstack.password,
-        tenant_name=CONF.openstack.project)
+        tenant_name=CONF.openstack.project,
+        insecure=CONF.openstack.insecure)
     return neutron
 
 

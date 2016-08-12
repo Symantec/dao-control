@@ -12,56 +12,34 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import datetime
-import eventlet
 import netaddr
 import traceback
 import uuid
 
+import flask
+
 from dao.common import log
-from dao.common import rpc
 from dao.common import config
 from dao.control import exceptions
-from dao.control import server_helper
 from dao.control import server_processor
 from dao.control import worker_api
 from dao.control.db import api as db_api
 
 
-opts = [config.StrOpt('master', 'port', default='5555',
-                      help='port to access master')
-        ]
-
-config.register(opts)
 CONF = config.get_config()
-
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
+app = flask.Flask(__name__)
 
 
 class Context(object):
-    def __init__(self, reply_to, user, location):
-        self.reply_to = reply_to
+    def __init__(self, user, location):
         self.user = user
         self.location = location
 
 
-class Manager(rpc.RPCServer):
+class Manager(object):
     def __init__(self):
-        super(Manager, self).__init__(CONF.master.port)
         self.db = db_api.Driver()
-
-    def _call(self, reply_addr, func_name, args, kwargs):
-        """
-        :type reply_addr: str
-        :type func_name: str
-        :type args: list
-        :type kwargs: dict
-        :rtype: any
-        """
-        user, environment, args = args[0], args[1], args[2:]
-        context = Context(reply_addr, user, environment)
-        args = (context,) + args
-        super(Manager, self)._call(reply_addr, func_name, args, kwargs)
 
     def objects_list(self, context, cls, joins, loads, **kwargs):
         return [obj.to_dict() for obj in
@@ -72,6 +50,21 @@ class Manager(rpc.RPCServer):
         for k, v in args_dict.items():
             setattr(obj, k, v)
         self.db.update(obj, log=True)
+
+    def register_server(self, context, serial, lock_id):
+        """ Register server. Function is to be called from on server boot.
+        :type ip: str
+        :type asset: dict([brand, model, serial, ip, mac])
+        :type interfaces: dict
+        """
+        try:
+            pxe_boot = self.db.pxe_boot_one(serial=serial, lock_id=lock_id)
+            pxe_boot.ready = True
+            self.db.update(pxe_boot, log=False)
+        except exceptions.DAONotFound, exc:
+            # Send True to keep it calm
+            LOG.debug(exc)
+        return True
 
     def asset_protect(self, context, serial, rack_name, set_protected):
         rack = self.db.rack_get(name=rack_name)
@@ -197,7 +190,7 @@ class Manager(rpc.RPCServer):
             raise exceptions.DAOConflict('Rack is under maintenance')
         request_id = uuid.uuid4().get_hex()
         response = ['Request_id={0}'.format(request_id)]
-        logger.info('Request id: {0}'.format(request_id))
+        LOG.info('Request id: {0}'.format(request_id))
         filters = {'asset.rack.location': context.location}
         if rack_name:
             filters['asset.rack.name'] = rack_name
@@ -363,7 +356,8 @@ class Manager(rpc.RPCServer):
                            'fqdn', 'target_status', 'cluster.name',
                            'interfaces', 'description', 'asset.protected',
                            'server_number', 'pxe_mac', 'pxe_ip', 'asset.ip',
-                           'asset.mac', 'rack_unit', 'asset.key'])
+                           'asset.mac', 'rack_unit', 'asset.key',
+                           'chassis_serial'])
         if_fields = ['state', 'mac', 'name']
         result = dict()
         for server in servers:
@@ -382,6 +376,10 @@ class Manager(rpc.RPCServer):
 
     def assets_list(self, context, rack_name, protected, names,
                     serials, type_):
+        def to_dict(_asset):
+            d = _asset.to_dict(deep=False)
+            d['rack_name'] = _asset.rack.name
+            return d
         # get servers
         filters = dict()
         filters['rack.location'] = context.location
@@ -397,9 +395,9 @@ class Manager(rpc.RPCServer):
             filters['type'] = type_
 
         assets = self.db.assets_get_by(**filters)
-        fields = ['name', 'asset_tag', 'ip', 'mac', 'location', 'serial',
-                  'status', 'type', 'protected', 'model', 'brand']
-        result = [asset.to_dict(deep=False) for asset in assets]
+        # fields = ['name', 'asset_tag', 'ip', 'mac', 'location', 'serial',
+        #           'status', 'type', 'protected', 'model', 'brand']
+        result = [to_dict(asset) for asset in assets]
         return result
 
     def rack_list(self, context, detailed, **kwargs):
@@ -483,12 +481,32 @@ class Manager(rpc.RPCServer):
         return self.db.worker_get(**filters)
 
 
-def run():
-    logger.info('Started')
+@app.route('/v1.0/tasks', methods=['POST'])
+def task():
+    m = Manager()
+    request = flask.request
+    if not request.json or \
+        not 'func' in request.json or \
+        not 'args' in request.json or \
+        not 'kwargs' in request.json:
+        flask.abort(400)
+    func_name = request.json['func']
+    args = request.json['args']
+    kwargs = request.json['kwargs']
+    user, environment, args = args[0], args[1], args[2:]
+    context = Context(user, environment)
+    args = (context,) + tuple(args)
     try:
-        eventlet.monkey_patch()
-        manager = Manager()
-        manager.do_main()
+        result = getattr(m, func_name)(*args, **kwargs)
+    except Exception, exc:
+        return exc.message, 418
+    return flask.jsonify({'result': result}), 201
+
+
+def run():
+    LOG.info('Started')
+    try:
+        app.run(debug=True)
     except:
-        logger.warning(traceback.format_exc())
+        LOG.warning(traceback.format_exc())
         raise

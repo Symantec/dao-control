@@ -242,6 +242,21 @@ class Cluster(Base):
     type = Column(String(255), nullable=False)
 
 
+class Chassis(Base):
+    __tablename__ = 'chassis'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+
+    asset_id = Column(Integer, ForeignKey('asset.id'), nullable=True)
+    asset = relationship(Asset, foreign_keys=asset_id,
+                         primaryjoin=asset_id == Asset.id)
+
+    @property
+    def rack_name(self):
+        return self.asset.rack.name
+
+
 class NetworkDevice(Base):
     __tablename__ = 'switch'
 
@@ -314,6 +329,7 @@ class Server(Base):
 
     rack_unit = Column(Integer)
     description = Column(Text)
+    chassis_serial = Column(String(63))
     # Fields required by framework itself
     lock_id = Column(String(36))
     hdd_type = Column(String(127))
@@ -423,3 +439,11 @@ class ChangeLog(Base):
     type = Column(String(32), nullable=False)
     old = Column(JSONEncodedDict)
     new = Column(JSONEncodedDict)
+
+
+class PxEBoot(Base):
+    __tablename__ = 'pxe_boot'
+    id = Column(Integer, primary_key=True)
+    serial = Column(String(32), nullable=False)
+    lock_id = Column(String(36), nullable=False)
+    ready = Column(Boolean, default=False)

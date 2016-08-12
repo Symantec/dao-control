@@ -16,14 +16,18 @@
 import daemon
 
 
+def setup_env():
+    from dao.common import config
+    from dao.control import opts
+    config.setup('control', opts.conf_opts)
+
+    from dao.common import log
+    log.setup('master')
+
+
 def _run():
     try:
-        from dao.common import config
-        from dao.control import opts
-        config.setup('control', opts.conf_opts)
-
-        from dao.common import log
-        log.setup('master')
+        setup_env()
         from dao.control.master import manager
         manager.run()
     except Exception, exc:

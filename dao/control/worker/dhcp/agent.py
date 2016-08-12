@@ -36,7 +36,7 @@ class DHCPHelper(base.DHCPBase):
         self.tags = [self.net2vlan[net] for net in ['mgmt', 'ipmi']]
 
         self.db = db_api.Driver()
-        self.dhcp_api = rpc.RPCApi(CONF.foreman.dhcp_proxy_url)
+        self.dhcp_api = rpc.RPCApi(CONF.dhcp.agent_url)
         self._worker = worker
         self._subnets = self._reinit_subnets()
 
@@ -149,7 +149,7 @@ class DHCPHelper(base.DHCPBase):
 
     def _reinit_dhcp(self, rack2net):
         # Preapare data for api call
-        dhcp_api = rpc.RPCApi(CONF.foreman.dhcp_proxy_url)
+        dhcp_api = rpc.RPCApi(CONF.dhcp.agent_url)
         result = dhcp_api.call('update_networks')
         if isinstance(result, Exception):
             raise exceptions.DAOException('DHCP call {0} failed: {1}'.

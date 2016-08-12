@@ -23,4 +23,5 @@ CONF = config.get_config()
 def get_client():
     return client.Client(CONF.openstack.username, CONF.openstack.password,
                          CONF.openstack.project, CONF.openstack.auth_url,
-                         region_name=CONF.openstack.region)
+                         region_name=CONF.openstack.region,
+                         insecure=CONF.openstack.insecure)

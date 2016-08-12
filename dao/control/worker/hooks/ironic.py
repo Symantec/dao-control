@@ -130,7 +130,7 @@ class IronicHook(hook_base.HookBase):
         dhcp.delete_for_serial(self.server.asset.serial, ignored='ipmi')
         self.server.network = None
         self.server.pxe_ip = None
-        self.server = self.db.server_update(self.server)
+        self.db.server_update(self.server)
 
         # Create Ironic node and keep it turned off
         new_node = ironic.node.create(**kwargs)
@@ -144,7 +144,7 @@ class IronicHook(hook_base.HookBase):
 
         # Mark server as controlled by Ironic and exit
         self.server.meta['ironicated'] = True
-        self.server = self.db.server_update(self.server)
+        self.db.server_update(self.server)
         return self.server
 
     def pre_provision(self):

@@ -1,12 +1,9 @@
-from migrate import ForeignKeyConstraint
 from sqlalchemy import Column, Table, MetaData, Index
 import logging
 
 from sqlalchemy.dialects.mysql.base import DATETIME
 from sqlalchemy.dialects.mysql.base import INTEGER
 from sqlalchemy.dialects.mysql.base import VARCHAR
-from sqlalchemy.dialects.mysql.base import ENUM
-from sqlalchemy.dialects.mysql.base import TINYINT
 from sqlalchemy.dialects.mysql.base import TEXT
 
 LOG = logging.getLogger(__name__)

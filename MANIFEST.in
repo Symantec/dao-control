@@ -1,5 +1,5 @@
 exclude .gitignore
 exclude .gitreview
 include dao/control/db/migrate_repo/migrate.cfg
+include dao/control/worker/provisioning/pxe.template
 global-exclude *.pyc
-

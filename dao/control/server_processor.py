@@ -46,8 +46,7 @@ class ServerProcessor(object):
                 return self.skip()
         else:
             self.server.lock_id = ''
-            self.server = self.db.server_update(self.server,
-                                                comment='Target status ok')
+            self.db.server_update(self.server, comment='Target status ok')
             return False
 
     def error(self, message):
@@ -60,7 +59,7 @@ class ServerProcessor(object):
         self.server.status = status2status.get(self.server.status,
                                                'Unknown')
         message = str(message)
-        self.server = self.db.server_update(self.server, message[-253:])
+        self.db.server_update(self.server, message[-253:])
 
     def s0_s1(self):
         worker = worker_api.WorkerAPI.get_api(rack_name=self.server.rack_name)
@@ -83,5 +82,5 @@ class ServerProcessor(object):
     def skip(self):
         if self.server.lock_id:
             self.server.lock_id = ''
-            self.server = self.db.server_update(self.server)
+            self.db.server_update(self.server)
         return False

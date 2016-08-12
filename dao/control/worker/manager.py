@@ -29,7 +29,6 @@ from dao.control import server_processor
 from dao.control import sku
 from dao.control.db import api as db_api
 from dao.control.worker import discovery
-from dao.control.worker import foreman_helper
 from dao.control.worker import provisioning
 from dao.control.worker import rack_discover
 from dao.control.worker.dhcp import base as dhcp_helper
@@ -51,8 +50,8 @@ opts = [
                   help='Network name where server FQDN is reachable.'),
 
     config.IntOpt('worker', 'validation_port',
-                  default=5555,
-                  help='Port number of validation agent.')
+                  default=5000,
+                  help='Port number of validation agent.'),
 
 ]
 
@@ -92,7 +91,7 @@ class Manager(rpc.RPCServer):
         self.worker = self.db.worker_register(CONF.worker.name, self.url,
                                               CONF.common.location)
         self.dhcp = dhcp_helper.DHCPBase.get_helper(self.worker)
-        self.provision = provisioning.get_driver()
+        self.provision = provisioning.get_driver(self.url)
         self.discovery = discovery.Discovery(self.worker,
                                              self.dhcp)
         self.vlan2net = server_helper.vlan2net()
@@ -174,25 +173,6 @@ class Manager(rpc.RPCServer):
         self.discovery.server_delete(server)
         return 'Deleted'
 
-    def register_server(self, ip, asset, interfaces):
-        """ Register server. Function is to be called from validation image.
-        :type ip: str
-        :type asset: dict([brand, model, serial, ip, mac])
-        :type interfaces: dict
-        """
-        try:
-            s = self.db.server_get_by(**{'asset.serial': asset['serial']})
-            if s.asset.status != 'New':
-                return True
-            self.discovery.register(s, asset, interfaces)
-        except exceptions.DAOIgnore, exc:
-            logger.debug(exc)
-            return False
-        except exceptions.DAONotFound, exc:
-            # Send True to keep it calm
-            logger.debug(exc)
-        return True
-
     def rack_renumber(self, rack_name, fake):
         """ Generate server number and rack unit """
         servers = self.db.servers_get_by(**{'asset.rack.name': rack_name})
@@ -223,7 +203,7 @@ class Manager(rpc.RPCServer):
             try:
                 server.status = 'Validating'
                 server.message = ''
-                server = self.db.server_update(server, 'Validating started')
+                self.db.server_update(server, 'Validating started')
 
                 hook_base.HookBase.get_hook(server, self.db).pre_validate()
                 rack, server = self._prepare_server(server, 'Validating')
@@ -234,7 +214,7 @@ class Manager(rpc.RPCServer):
                 rack.status = status
                 rack = self.db.rack_update(rack)
                 self.provision.server_s0_s1(server, rack)
-                server = self.db.server_update(server)
+                self.db.server_update(server)
             except Exception, exc:
                 msg = str(traceback.format_exc())
                 logger.warning('Error: %s, msg is %s', server.name, msg)
@@ -269,7 +249,7 @@ class Manager(rpc.RPCServer):
                 self._switch.switch_validate_for_server(rack, server)
                 # Validation completed
                 server.status = 'Validated'
-                server = self.db.server_update(server, comment='Validated')
+                self.db.server_update(server, comment='Validated')
                 server = hook_base.HookBase.get_hook(server,
                                                      self.db).validated()
                 server_processor.ServerProcessor(server).next()
@@ -281,6 +261,7 @@ class Manager(rpc.RPCServer):
                 logger.warning(traceback.format_exc())
                 if isinstance(exc, KeyError):
                     exc.message = 'KeyError: {0}'.format(exc.message)
+                server = self._reload_server_record(server)
                 server_processor.ServerProcessor(server).error(exc.message)
 
     def _run_validation_scripts(self, server):
@@ -288,36 +269,48 @@ class Manager(rpc.RPCServer):
         :type server: api.models.Server
         :rtype: api.models.Server
         """
-        server = self.db.server_update(server,
-                                       'Running validation script')
+        self.db.server_update(server, 'Running validation script')
         rack = self.db.rack_get(id=server.asset.rack_id)
         # Weird but let the server load everything
         eventlet.sleep(60)
         # Prepare validation script parameters
-        api = rpc.RPCApi(ip=server_helper.get_net_ip(server, 'mgmt'),
-                         port=CONF.worker.validation_port,
-                         timeout=5*60)
+        ip = server_helper.get_net_ip(server, 'mgmt')
         if server.asset.status == 'New':
             # New server. Pull the interfaces data and generate networking
             code = validation_helper.get_server_info_code()
-            asset_dict, interfaces = api.call('validate', {}, code)
-            server = self.discovery.finalize(server, asset_dict,
-                                             interfaces)
+            asset_dict, interfaces = \
+                self.call_dao_agent(ip, {}, code)
+            self.discovery.finalize(server, asset_dict, interfaces)
+            server = self._reload_server_record(server)
             nets = self.db.subnets_get(rack.name)
             server.network = server_helper.generate_network(
                 self.dhcp, rack, server, nets)
-            server = self.db.server_update(server)
+            self.db.server_update(server)
+            server = self._reload_server_record(server)
         # Run validation script
         s_dict = server.to_dict()
         s_dict['meta']['network'] = server_helper.network_build(rack, server)
         code = validation_helper.get_validation_code()
-        hw_info = api.call('validate', s_dict, code)
-        if isinstance(hw_info, Exception):
-            raise exceptions.DAOException(repr(hw_info.message))
+        hw_info = self.call_dao_agent(ip, s_dict, code)
         # And finally validate and update sku for server/rack
-        server = sku.update_sku(self.db, server, hw_info)
+        sku.update_sku(self.db, server, hw_info)
         sku.update_sku_quota(self.db, server)
         return server
+
+    def _reload_server_record(self, server):
+        return self.db.server_get_by(id=server.id, lock_id=server.lock_id)
+
+    @staticmethod
+    def call_dao_agent(ip, server_dict, code):
+        data = dict(server_dict=server_dict, code=code)
+        result = requests.post('http://{0}:5000/v1.0/validate'.format(ip),
+                               data=json.dumps(data),
+                               headers={'Content-Type': 'application/json'})
+
+        if 200 <= result.status_code <= 300:
+            return result.json()['result']
+        else:
+            raise exceptions.DAOException(result.text)
 
     def provision_server(self, sid, lock_id):
         """ Configure provisioning tool to provision server with a final image
@@ -332,23 +325,19 @@ class Manager(rpc.RPCServer):
             server = self.db.server_get_by(id=sid, lock_id=lock_id)
             try:
                 server.status = 'Provisioning'
-                server = self.db.server_update(server, 'Provisioning started')
+                self.db.server_update(server, 'Provisioning started')
                 hook_base.HookBase.get_hook(server, self.db).pre_provision()
                 rack, server = self._prepare_server(server, 'Provisioning')
                 port = CONF.worker.validation_port
                 up, _ = validation_helper.is_up(server, port)
                 if up:
                     # Configure HDD first
-                    api = rpc.RPCApi(
-                        ip=server_helper.get_net_ip(server, 'mgmt'),
-                        port=port, timeout=5*60)
+                    ip = server_helper.get_net_ip(server, 'mgmt')
                     code = validation_helper.get_raid_configure_code()
-                    result = api.call('validate', server.to_dict(), code)
-                    if isinstance(result, Exception):
-                        raise exceptions.DAOProvisionIncomplete(result.message)
+                    self.call_dao_agent(ip, server.to_dict(), code)
                     # And finally start provisioning
                     self.provision.server_s1_s2(server, rack)
-                    server = self.db.server_update(server, 'Provisioned')
+                    self.db.server_update(server, 'Provisioned')
                 else:
                     msg = 'Validation agent is not loaded, restart from S0'
                     server_processor.ServerProcessor(server).error(msg)
@@ -374,7 +363,7 @@ class Manager(rpc.RPCServer):
                     server, CONF.worker.fqdn_net)
                 if done:
                     server.status = 'Provisioned'
-                    server = self.db.server_update(server)
+                    self.db.server_update(server)
                     server_processor.ServerProcessor(server).next()
                     hook_base.HookBase.get_hook(server, self.db).provisioned()
                 else:
@@ -405,7 +394,7 @@ class Manager(rpc.RPCServer):
         # generate name + fqdn
         server.name = server.generate_name(rack.environment)
         server.fqdn = server_helper.fqdn_get(server)
-        server = self.db.server_update(server, '%s started' % status)
+        self.db.server_update(server, '%s started' % status)
         return rack, server
 
     def os_list(self, os_name):
@@ -416,35 +405,9 @@ class Manager(rpc.RPCServer):
     @staticmethod
     def health_check():
         """Perform dependent systems health check.
-        Verify operability of Foreman and Proxies.
-
         :returns: dict
         """
-        status = {
-            'foreman': 'OK',
-            'proxy_tftp': 'OK',
-        }
-
-        # Foreman check
-        foreman = foreman_helper.Foreman()
-        try:
-            foreman.foreman_test()
-        except Exception as e:
-            status['foreman'] = 'FAIL: {msg}'.format(msg=e.message)
-
-        # Tftp proxy check
-        proxies = foreman._request('get', 'api/smart_proxies')
-        tftp_proxy_urls = [p['url'] for p in proxies['results']
-                           if p['features'][0]['name'] == 'TFTP']
-        # Check all configured proxies (though usually it's just one).
-        for proxy in tftp_proxy_urls:
-            req_url = '{proxy}/tftp/serverName'.format(proxy=proxy)
-            try:
-                result = json.loads(requests.get(req_url, verify=False).text)
-                if not result['serverName']:
-                    status['proxy_tftp'] = 'FAIL'
-            except Exception as e:
-                status['proxy_tftp'] = 'FAIL: {msg}'.format(msg=e.message)
+        status = {}
         return status
 
     def do_main(self):

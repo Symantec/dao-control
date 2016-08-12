@@ -18,9 +18,11 @@ from dao.control.worker import orchestration
 
 
 class BaseDriver(object):
-    def __init__(self):
+    def __init__(self, worker_url=None):
         self.db = db_api.Driver()
         self.orchestrator = orchestration.get_driver()
+        self.worker_url = worker_url
+        self.on_init()
 
     def on_init(self):
         pass
@@ -45,10 +47,6 @@ class BaseDriver(object):
     def is_provisioned(self, server, iface):
         """Check if server is provisioned.
         """
-        raise NotImplementedError()
-
-    def get_tftp_ip(self):
-        """Return """
         raise NotImplementedError()
 
     def os_list(self, os_name):

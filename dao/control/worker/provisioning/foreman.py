@@ -17,11 +17,10 @@ import socket
 import yaml
 from dao.common import config
 from dao.common import log
-from dao.common import rpc
 from dao.common import utils
 from dao.control import exceptions
 from dao.control import server_helper
-from dao.control.worker import foreman_helper
+from dao.control.worker.provisioning import foreman_helper
 from dao.control.worker.provisioning import driver
 from dao.control.worker.provisioning import server_update
 
@@ -32,10 +31,10 @@ logger = log.getLogger(__name__)
 
 
 class ForemanDriver(driver.BaseDriver):
-    def __init__(self):
-        super(ForemanDriver, self).__init__()
+    helper = None
+
+    def on_init(self):
         self.helper = foreman_helper.Foreman()
-        self.on_init()
 
     def test(self):
         return self.helper.foreman_test()
@@ -48,7 +47,7 @@ class ForemanDriver(driver.BaseDriver):
         server_update.pre_validation(server)
         os_args = dict(os_name=CONF.foreman.s1_os_name)
         self.helper.ensure_os_family(os_args)
-        return self.helper.server_build(
+        self.helper.server_build(
             server, subnets,
             env_name=CONF.foreman.s1_environment % server.to_dict(),
             os_args=os_args,
@@ -67,7 +66,7 @@ class ForemanDriver(driver.BaseDriver):
         parameters.update(self.orchestrator.get_provision_parameters())
         self.helper.ensure_os_family(server.os_args)
         build_net = server_helper.network_build_patched(rack, server)
-        fserver = self.helper.server_build(
+        self.helper.server_build(
             server, subnets,
             env_name=CONF.foreman.s2_environment % server.to_dict(),
             os_args=server.os_args,
@@ -75,7 +74,6 @@ class ForemanDriver(driver.BaseDriver):
             gateway='prod',
             build_net=build_net)
         self.orchestrator.host_recreated(server)
-        return fserver
 
     def is_provisioned(self, server, iface):
         host = self.helper.get_host(server)
@@ -86,10 +84,6 @@ class ForemanDriver(driver.BaseDriver):
                 return False, 'Waiting SSH port up'
         else:
             return False, 'Waiting build completed'
-
-    @staticmethod
-    def get_tftp_ip():
-        return CONF.foreman.url.split('://')[-1].rsplit(':')[0]
 
     def os_list(self, os_name):
         """List OS (hostgroups in reality) with parameters.

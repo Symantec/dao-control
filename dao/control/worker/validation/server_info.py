@@ -32,7 +32,6 @@ class IPMIHelper(object):
     @classmethod
     def get_backend(cls):
         """
-
         :rtype: IPMIHelper
         """
         fru = cls._run_sh('ipmitool', 'fru', ret_codes=[0, 1])

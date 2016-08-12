@@ -20,7 +20,7 @@ import time
 
 
 def send_error(error_msg):
-    raise RuntimeError('ValidatedWithErrors: ', error_msg)
+    raise RuntimeError('Pre-provisioning error: {0}'.format(error_msg))
 
 
 def raid_init(_server, raid):

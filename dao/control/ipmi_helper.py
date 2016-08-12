@@ -12,10 +12,14 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import eventlet
 import functools
 import netaddr
 import re
 import time
+from pysnmp.smi import builder, view
+
+cmdgen = eventlet.import_patched('pysnmp.entity.rfc3413.oneliner.cmdgen')
 
 from dao.common import config
 from dao.common import log
@@ -25,12 +29,24 @@ from dao.control import exceptions
 opts = [
     config.BoolOpt('worker', 'ipmi_timeout',
                    default=20*60,
-                   help='Timeout for IPMI operation.')
+                   help='Timeout for IPMI operation.'),
+
+    config.StrOpt('worker', 'snmp_community',
+                  default='public',
+                  help='SNMP community data field for snmpv1'),
+
+    config.IntOpt('worker', 'snmp_port',
+                  default=161,
+                  help='SNMP port to use')
 ]
 
 config.register(opts)
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
+
+mib_builder = builder.MibBuilder()
+mib_builder.loadModules('SNMPv2-MIB')
+mib_view = view.MibViewController(mib_builder)
 
 
 class IPMIHelper(object):
@@ -38,25 +54,34 @@ class IPMIHelper(object):
     password = CONF.worker.ipmi_password
     brand_name = None
     re_vendor = re.compile('Product Manufacturer.*: (\w+)')
+    mib_brand_id = None
+    mib_header = 'iso.org.dod.internet.private.enterprises'
 
-    def __init__(self, ip, serial):
+    def __init__(self, ip, serial, asset_type, chassis_serial):
         self.ip = ip
         self.serial = serial
+        self.asset_type = asset_type
+        self.chassis_serial = chassis_serial
 
     @classmethod
     def get_backend(cls, ip):
         """
         :rtype: IPMIHelper
         """
-        backends = [Dell, SuperMicro]
-        fru = cls._run_sh('ipmitool', '-I', 'lanplus',
-                          '-H', ip, '-U', cls.user, '-P', cls.password,
-                          'fru', ret_codes=[0, 1])
-        fru = cls._section_to_dict(cls._get_fru_section(fru))
-        brand = fru.get('Board Mfg', '').capitalize()
-        for backend in backends:
-            if backend.brand_name == brand:
-                return backend(ip, fru)
+        # In order to support different brands, use SNMP first
+        # ipmitool doesn't work for FX2 chassis
+        try:
+            oid = cls._snmp_invoke(ip, 'SNMPv2-MIB', 'sysObjectID', '0')
+        except exceptions.DAOException, exc:
+            LOG.debug('Unable to communicate to idrac: %s' % repr(exc))
+            raise exceptions.DAONotFound('Backend for %s is not supported' % ip)
+
+        oid, label, suffix = mib_view.getNodeNameByOid(oid)
+        backends = [Dell]
+        label = '.'.join(label)
+        for b_cls in backends:
+            if label == b_cls.mib_header and suffix[0] == b_cls.mib_brand_id:
+                return b_cls(ip)
         else:
             raise exceptions.DAONotFound(
                 'Backend for %s is not supported' % ip)
@@ -80,6 +105,26 @@ class IPMIHelper(object):
     def match_vendor(cls, fru):
         result = cls.re_vendor.findall(fru)
         return result and result[0].capitalize() == cls.brand_name
+
+    @classmethod
+    def _snmp_invoke(cls, ip, *oid):
+        cmd_gen = cmdgen.CommandGenerator()
+        error_indication, error_status, error_index, var_binds = \
+            cmd_gen.getCmd(
+                cmdgen.CommunityData(CONF.worker.snmp_community),
+                cmdgen.UdpTransportTarget((ip, CONF.worker.snmp_port)),
+                cmdgen.MibVariable(*oid))
+
+        if error_indication or error_status or error_index:
+            raise exceptions.DAOException('SNMP Error: %r, %r, %r' %
+                                          (error_indication,
+                                           error_status,
+                                           error_index))
+        if not var_binds:
+            raise exceptions.DAOException('SNMP Error: no object %s value' %
+                                          repr(oid))
+
+        return var_binds[0][1]
 
     @classmethod
     def _run_sh(cls, *args, **kwargs):
@@ -130,12 +175,30 @@ class IPMIHelper(object):
 
 class Dell(IPMIHelper):
     brand_name = 'Dell'
+    mib_brand_id = 674
+    description_oid = 'enterprises.674.10892.2.1.1.1.0'
+    serial_oid = 'enterprises.674.10892.2.1.1.11.0'
+    chassis_oid = 'enterprises.674.10892.5.1.2.1.0'
     idrac_tool = 'idracadm7'
     re_mac = re.compile('Current[^M]* MAC Address:\s+([0-9A-F:]+)')
 
-    def __init__(self, ip, fru):
-        serial = fru['Product Serial']
-        super(Dell, self).__init__(ip, serial)
+    def __init__(self, ip):
+        description = self._snmp_invoke(
+            ip, 'SNMPv2-SMI', *self.description_oid.split('.')).prettyPrint()
+        if description.lower() == 'chassis management controller':
+            a_type = 'Chassis'
+            chassis_serial = ''
+        else:
+            a_type = 'Server'
+            chassis_serial = self._snmp_invoke(
+                ip, 'SNMPv2-SMI',  *self.chassis_oid.split('.')).prettyPrint()
+        serial = self._snmp_invoke(ip, 'SNMPv2-SMI',
+                                   *self.serial_oid.split('.')).prettyPrint()
+        if not serial:
+            LOG.info('Serial number for %s is empty', ip)
+            raise exceptions.DAOIgnore('Invalid serial number')
+
+        super(Dell, self).__init__(ip, serial, a_type, chassis_serial)
 
     def get_nic_mac(self, nic_name):
         out = self._run_sh(self.idrac_tool, '-r', self.ip, '-u', self.user,
@@ -143,18 +206,18 @@ class Dell(IPMIHelper):
                            'hwinventory', nic_name, ret_codes=[0, 2])
         return str(netaddr.eui.EUI(self.re_mac.search(out).group(1)))
 
-
-class SuperMicro(IPMIHelper):
-    brand_name = 'Supermicro'
-    ipmi_tool = 'SMCIPMITool'
-    re_mac = re.compile('Current[^M]* MAC Address:\s+([0-9A-F:]+)')
-
-    def __init__(self, ip, fru):
-        serial = fru['Product Serial']
-        super(SuperMicro, self).__init__(ip, serial)
-
-    def get_nic_mac(self, nic_name):
-        out = self._run_sh(self.ipmi_tool, self.ip,
-                           self.user, self.password,
-                           'ipmi', nic_name, 'mac')
-        return str(netaddr.eui.EUI(self.re_mac.search(out).group(1)))
+#
+# class SuperMicro(IPMIHelper):
+#     brand_name = 'Supermicro'
+#     ipmi_tool = 'SMCIPMITool'
+#     re_mac = re.compile('Current[^M]* MAC Address:\s+([0-9A-F:]+)')
+#
+#     def __init__(self, ip, fru):
+#         serial = fru['Product Serial']
+#         super(SuperMicro, self).__init__(ip, serial)
+#
+#     def get_nic_mac(self, nic_name):
+#         out = self._run_sh(self.ipmi_tool, self.ip,
+#                            self.user, self.password,
+#                            'ipmi', nic_name, 'mac')
+#         return str(netaddr.eui.EUI(self.re_mac.search(out).group(1)))

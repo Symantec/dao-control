@@ -448,14 +448,17 @@ class Driver(object):
         return cls.server_update(server)
 
     @classmethod
-    def server_update(cls, server, comment=None, log=False):
+    def server_update(cls, server, comment=None, log=False, reload=False):
         """Update single server using server key
         :type server: models.Server
         :rtype: models.Server"""
         if comment is not None:
             server.message = comment
         cls.update(server, log=log)
-        return cls.server_get_by(id=server.id)
+        if reload:
+            return cls.server_get_by(id=server.id)
+        else:
+            return server
 
     def servers_get_by_worker(self, worker, **kwargs):
         with Session() as session:
@@ -514,6 +517,37 @@ class Driver(object):
 
     def server_update_interface(self, interface):
         self._object_update(interface, force=True)
+
+    @classmethod
+    def pxe_boot_all(cls, **kwargs):
+        """
+        :param kwargs: filters joined by AND logic
+        :rtype: list of models.PxEBoot
+        """
+        return cls._object_get_by(models.PxEBoot, [], [], **kwargs).all()
+
+    @classmethod
+    def pxe_boot_one(cls, **kwargs):
+        """
+        :param kwargs: filters joined by AND logic
+        :rtype: models.PxEBoot
+        """
+        return cls._object_get_by(models.PxEBoot, [], [], **kwargs).one()
+
+    @classmethod
+    def pxe_boot_create(cls, serial, lock_id):
+        """
+        :param kwargs: filters joined by AND logic
+        :rtype: models.PxEBoot
+        """
+        pxe_boot = models.PxEBoot()
+
+        pxe_boot.serial = serial
+        pxe_boot.lock_id = lock_id
+
+        with Session() as session:
+            pxe_boot.save(session)
+            return pxe_boot
 
     def change_log(self, obj_type, obj_id):
         """
@@ -607,7 +641,7 @@ class Driver(object):
         return obj
 
     @staticmethod
-    def object_delete(obj):
+    def object_delete(obj, soft=True):
         """
         Soft delete DB object
         :type obj: models.DaoBase
@@ -615,7 +649,10 @@ class Driver(object):
         """
         session = get_session()
         with session.begin():
-            obj.soft_delete(session)
+            if soft:
+                obj.soft_delete(session)
+            else:
+                session.delete(obj)
 
     @staticmethod
     def _create_object(cls, values):

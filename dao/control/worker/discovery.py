@@ -151,12 +151,15 @@ class Discovery(object):
                     format(rack.name, self._worker.id))
             nets = self.db.subnets_get(rack_name=rack.name)
             asset, ipmi = self._ensure_asset(ipmi_ip, ipmi_mac, rack, nets)
-            # Asset is either found or created. If found check if
-            #  server exist
-            logger.info('New server: %s, %s', ipmi_ip, asset.serial)
-            self._discover_server(ipmi, rack, nets, asset)
+            if asset.type == 'Server':
+                # Asset is either found or created and is the server Asset.
+                # Ensure server exists
+                logger.info('New server: %s, %s', ipmi_ip, asset.serial)
+                self._discover_server(ipmi, rack, nets, asset)
+            else:
+                self._ignored.add(ipmi_mac)
         except exceptions.DAOIgnore, exc:
-            logger.debug('Server ignored: %s', exc.message)
+            logger.debug('Asset ignored: %s', exc.message)
         except Exception, exc:
             logger.warning('Discovery for %s failed: %s', ipmi_ip, exc.message)
             if 'is not supported' in exc.message:
@@ -185,11 +188,12 @@ class Discovery(object):
                        format(ipmi_ip, ipmi_mac, asset.serial))
                 logger.warning(msg)
                 raise exceptions.DAOIgnore(msg)
-            self.dhcp.allocate(rack, ipmi_net, serial, ipmi_mac, ipmi_ip)
+            if asset.ip != ipmi_ip:
+                asset.ip = ipmi_ip
+                self.dhcp.allocate(rack, ipmi_net, serial, ipmi_mac, ipmi_ip)
             asset.mac = ipmi_mac
-            asset.ip = ipmi_ip
+            asset.type = ipmi.asset_type
             if asset.protected:
-                asset.type = 'Server'
                 asset.status = 'New'
             asset = self.db.update(asset)
             if asset.protected:
@@ -205,7 +209,7 @@ class Discovery(object):
                                          serial=serial,
                                          location=rack.location,
                                          status='New',
-                                         type='Server')
+                                         type=ipmi.asset_type)
         return asset, ipmi
 
     def _discover_server(self, ipmi, rack, nets, asset):
@@ -231,14 +235,15 @@ class Discovery(object):
                       role=CONF.worker.spare_role,
                       name='discovery_{0}'.format(asset.serial),
                       meta=dict(network={}),
-                      lock_id='')
+                      lock_id='',
+                      chassis_serial=ipmi.chassis_serial)
         server = self.db.server_create(self._spare_cluster,
                                        asset, **server)
         logger.debug('Discovery: Server discovered: {0}'.format(
             pprint.pformat(server)))
         if CONF.worker.discovery_post_validation:
             server.lock_id = uuid.uuid4().get_hex()
-            server = self.db.server_update(server)
+            server = self.db.server_update(server, reload=True)
             server_processor.ServerProcessor(server).next()
             return True
 
@@ -247,7 +252,6 @@ class Discovery(object):
         :type server: dao.control.db.model.Server
         :type asset_dict: dict
         :type interfaces: list of dict
-        :rtype: bool
         """
         # Fill in server
         for iface in interfaces:
@@ -279,8 +283,7 @@ class Discovery(object):
         server.fqdn = server_helper.fqdn_get(server)
 
         self.db.update(server.asset)
-        server = self.db.server_update(server)
-        return server
+        self.db.server_update(server)
 
     @utils.CacheIt(180, ignore_self=True)
     def _subnets_get(self):

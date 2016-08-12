@@ -1,6 +1,4 @@
-from migrate import ForeignKeyConstraint
-from sqlalchemy import Column, Table, MetaData, Index
-import netaddr
+from sqlalchemy import Column, Table, MetaData
 import logging
 
 from sqlalchemy import VARCHAR

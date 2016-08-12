@@ -19,8 +19,7 @@ from dao.common import log
 
 
 opts = [config.StrOpt('worker', 'provision_driver',
-                      default='dao.control.worker.provisioning.'
-                              'foreman.ForemanDriver',
+                      default='dao.control.worker.provisioning.pxe.PxeDriver',
                       help='Backend module for provisioning')]
 
 config.register(opts)
@@ -29,11 +28,11 @@ CONF = config.get_config()
 logger = log.getLogger(__name__)
 
 
-def get_driver():
+def get_driver(worker_url=None):
     """
     :rtype: dao.control.worker.provisioning.foreman.ForemanDriver
     """
     module, obj = CONF.worker.provision_driver.rsplit('.', 1)
     logger.info('Load %s from %s', obj, module)
     module = eventlet.import_patched(module)
-    return getattr(module, obj)()
+    return getattr(module, obj)(worker_url)

@@ -42,14 +42,13 @@ def update_sku(db, server, hw_info):
                 break
 
         if sku_match is not None:
-            server = db.server_update_sku(server, sku)
+            db.server_update_sku(server, sku)
         else:
             msg = 'Validation failed, SKU not found for ' \
                   'cpu: {0}, ram: {1}, disks: {2}'.format(cpu, ram, storage)
             raise exceptions.DAOException(msg)
     else:
         raise exceptions.DAOException('HW info is empty')
-    return server
 
 
 @utils.Synchronized('sku.update_sku_quota')
