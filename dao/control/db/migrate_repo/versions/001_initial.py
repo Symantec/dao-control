@@ -221,8 +221,7 @@ def upgrade(migrate_engine):
                           primary_key=True, nullable=False),
                    Column('name', VARCHAR(length=63), nullable=False),
                    Column('worker_url', VARCHAR(length=255), nullable=False),
-                   Column('location', VARCHAR(length=31), nullable=False),
-    )
+                   Column('location', VARCHAR(length=31), nullable=False))
 
     # create all tables
     tables = [cluster, sku, network_map, subnet,

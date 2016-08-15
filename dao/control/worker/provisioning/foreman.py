@@ -27,7 +27,7 @@ from dao.control.worker.provisioning import server_update
 
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class ForemanDriver(driver.BaseDriver):
@@ -120,11 +120,11 @@ class ForemanDriver(driver.BaseDriver):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((host, int(22)))
-            logger.debug('%s connected', host)
+            LOG.debug('%s connected', host)
             s.close()
             return True
         except socket.error:
-            logger.debug('Fail to connect %s', host)
+            LOG.debug('Fail to connect %s', host)
             return False
 
     def _get_rack_networks(self, rack_name):

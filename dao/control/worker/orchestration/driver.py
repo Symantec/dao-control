@@ -19,7 +19,7 @@ from dao.common import log
 from dao.control import server_helper
 
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class BaseDriver(object):
@@ -53,9 +53,9 @@ class DummyDriver(BaseDriver):
             ip_address = server_helper.get_net_ip(server, iface)
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((ip_address, int(22)))
-            logger.debug('%s connected', server.fqdn)
+            LOG.debug('%s connected', server.fqdn)
             s.close()
             return True
         except socket.error:
-            logger.debug('Fail to connect %s', server.fqdn)
+            LOG.debug('Fail to connect %s', server.fqdn)
             return False

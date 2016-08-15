@@ -26,7 +26,7 @@ from dao.control.worker.dhcp import base
 
 
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class DHCPHelper(base.DHCPBase):

@@ -17,7 +17,7 @@ from dao.common import log
 from dao.control.db import api as db_api
 from dao.control import worker_api
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class ServerProcessor(object):
@@ -52,8 +52,8 @@ class ServerProcessor(object):
     def error(self, message):
         status2status = {'Validating': 'ValidatedWithErrors',
                          'Provisioning': 'ProvisionedWithErrors'}
-        logger.warning('Error for: {0.id}: {0.name}: {1}'.format(self.server,
-                                                                 message))
+        LOG.warning('Error for: {0.id}: {0.name}: {1}'.format(self.server,
+                                                              message))
         if self.server.lock_id:
             self.server.lock_id = ''
         self.server.status = status2status.get(self.server.status,

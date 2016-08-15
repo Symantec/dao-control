@@ -19,12 +19,12 @@ import re
 import time
 from pysnmp.smi import builder, view
 
-cmdgen = eventlet.import_patched('pysnmp.entity.rfc3413.oneliner.cmdgen')
-
 from dao.common import config
 from dao.common import log
 from dao.common import utils
 from dao.control import exceptions
+
+cmdgen = eventlet.import_patched('pysnmp.entity.rfc3413.oneliner.cmdgen')
 
 opts = [
     config.BoolOpt('worker', 'ipmi_timeout',
@@ -73,8 +73,9 @@ class IPMIHelper(object):
         try:
             oid = cls._snmp_invoke(ip, 'SNMPv2-MIB', 'sysObjectID', '0')
         except exceptions.DAOException, exc:
-            LOG.debug('Unable to communicate to idrac: %s' % repr(exc))
-            raise exceptions.DAONotFound('Backend for %s is not supported' % ip)
+            LOG.debug('Unable to communicate to idrac: {0}'.format(repr(exc)))
+            raise exceptions.DAONotFound('Backend for {0} is not supported'.
+                                         format(ip))
 
         oid, label, suffix = mib_view.getNodeNameByOid(oid)
         backends = [Dell]
@@ -205,19 +206,3 @@ class Dell(IPMIHelper):
                            '-p', self.password,
                            'hwinventory', nic_name, ret_codes=[0, 2])
         return str(netaddr.eui.EUI(self.re_mac.search(out).group(1)))
-
-#
-# class SuperMicro(IPMIHelper):
-#     brand_name = 'Supermicro'
-#     ipmi_tool = 'SMCIPMITool'
-#     re_mac = re.compile('Current[^M]* MAC Address:\s+([0-9A-F:]+)')
-#
-#     def __init__(self, ip, fru):
-#         serial = fru['Product Serial']
-#         super(SuperMicro, self).__init__(ip, serial)
-#
-#     def get_nic_mac(self, nic_name):
-#         out = self._run_sh(self.ipmi_tool, self.ip,
-#                            self.user, self.password,
-#                            'ipmi', nic_name, 'mac')
-#         return str(netaddr.eui.EUI(self.re_mac.search(out).group(1)))

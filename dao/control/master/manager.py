@@ -485,10 +485,10 @@ class Manager(object):
 def task():
     m = Manager()
     request = flask.request
-    if not request.json or \
-        not 'func' in request.json or \
-        not 'args' in request.json or \
-        not 'kwargs' in request.json:
+    if (not request.json or
+            'func' not in request.json or
+            'args' not in request.json or
+            'kwargs' not in request.json):
         flask.abort(400)
     func_name = request.json['func']
     args = request.json['args']

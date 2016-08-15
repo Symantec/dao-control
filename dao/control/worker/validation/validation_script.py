@@ -15,7 +15,6 @@
 # under the License.
 
 
-
 import netaddr
 import os
 import sh

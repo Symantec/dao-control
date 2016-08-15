@@ -14,7 +14,7 @@
 
 from dao.common import config
 from dao.control import opts
-config.setup('control', opts.conf_opts)
-
+config.setup('control', opts.conf_opts)  # noqa
 from dao.common import log
+
 log.setup('tools')

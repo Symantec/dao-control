@@ -58,7 +58,7 @@ opts = [
 config.register(opts)
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class ServerLock(object):
@@ -217,7 +217,7 @@ class Manager(rpc.RPCServer):
                 self.db.server_update(server)
             except Exception, exc:
                 msg = str(traceback.format_exc())
-                logger.warning('Error: %s, msg is %s', server.name, msg)
+                LOG.warning('Error: %s, msg is %s', server.name, msg)
                 server_processor.ServerProcessor(server).error(exc.message)
                 raise
 
@@ -258,7 +258,7 @@ class Manager(rpc.RPCServer):
                 server.message = exc.message
                 self.db.update(server)
             except Exception, exc:
-                logger.warning(traceback.format_exc())
+                LOG.warning(traceback.format_exc())
                 if isinstance(exc, KeyError):
                     exc.message = 'KeyError: {0}'.format(exc.message)
                 server = self._reload_server_record(server)
@@ -342,9 +342,9 @@ class Manager(rpc.RPCServer):
                     msg = 'Validation agent is not loaded, restart from S0'
                     server_processor.ServerProcessor(server).error(msg)
             except Exception, exc:
-                logger.warning(exc.message)
+                LOG.warning(exc.message)
                 msg = str(traceback.format_exc())
-                logger.warning('Error: %s, msg is %s', server.name, msg)
+                LOG.warning('Error: %s, msg is %s', server.name, msg)
                 server_processor.ServerProcessor(server).error(exc.message)
                 raise
 
@@ -371,7 +371,7 @@ class Manager(rpc.RPCServer):
                         self.db.server_update(server, msg)
             except Exception, exc:
                 msg = str(traceback.format_exc())
-                logger.warning('Error: %s, msg is %s', server.name, msg)
+                LOG.warning('Error: %s, msg is %s', server.name, msg)
                 server_processor.ServerProcessor(server).error(exc.message)
 
     def _prepare_server(self, server, status):
@@ -424,7 +424,7 @@ class Manager(rpc.RPCServer):
                 self._check_state()
             except Exception:
                 traceback.print_exc()
-                logger.warning(traceback.format_exc())
+                LOG.warning(traceback.format_exc())
             eventlet.sleep(30)
 
     def _check_state(self):
@@ -456,18 +456,18 @@ class Manager(rpc.RPCServer):
                     self._spawn(None, func_name, (server.id,
                                                   server.lock_id), {})
                 except exceptions.DAONotFound, exc:
-                    logger.warning(traceback.format_exc())
+                    LOG.warning(traceback.format_exc())
                     server_processor.ServerProcessor(server).error(exc.message)
                 except Exception:
-                    logger.warning(traceback.format_exc())
+                    LOG.warning(traceback.format_exc())
 
 
 def run():
-    logger.info('Started')
+    LOG.info('Started')
     try:
         manager = Manager()
         eventlet.monkey_patch()
         manager.do_main()
     except Exception:
-        logger.warning(traceback.format_exc())
+        LOG.warning(traceback.format_exc())
         raise

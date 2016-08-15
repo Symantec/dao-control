@@ -19,7 +19,7 @@ from dao.control import exceptions
 
 
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 def update_sku(db, server, hw_info):

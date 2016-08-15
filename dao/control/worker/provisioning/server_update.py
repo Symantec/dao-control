@@ -20,7 +20,7 @@ from dao.common import log
 from dao.common import config
 from dao.control import exceptions
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 opts = [config.StrOpt('worker', 'validation_scripts_path',
@@ -38,13 +38,13 @@ CONF = config.get_config()
 def pre_validation(server):
     if server.asset.status != 'New':
         idrac_ip = server.asset.ip
-        logger.info('Validating server %s (iDrac: %s)', server.name, idrac_ip)
+        LOG.info('Validating server %s (iDrac: %s)', server.name, idrac_ip)
         script_names = CONF.worker.validation_scripts.split(',')
         backend = PreValidationBase.get_instance(server)
         for script in script_names:
             getattr(backend, script)()
-        logger.info('Success validating server %s (iDrac: %s)',
-                    server.name, idrac_ip)
+        LOG.info('Success validating server %s (iDrac: %s)',
+                 server.name, idrac_ip)
 
 
 class PreValidationBase(object):
@@ -101,7 +101,7 @@ class DellValidation(PreValidationBase):
         idrac_ip = self.server.asset.ip
         script = os.path.join(CONF.worker.validation_scripts_path, script)
 
-        logger.info('Run script: %s (iDrac: %s)', script, idrac_ip)
+        LOG.info('Run script: %s (iDrac: %s)', script, idrac_ip)
         try:
             subprocess.check_call([script, idrac_ip,
                                    CONF.worker.ipmi_login,
@@ -111,14 +111,14 @@ class DellValidation(PreValidationBase):
                 format(e.cmd, e.returncode, idrac_ip)
             message = message.replace(CONF.worker.ipmi_login, '<user>')
             message = message.replace(CONF.worker.ipmi_password, '<pwd>')
-            logger.error(message)
+            LOG.error(message)
             raise exceptions.DAOProvisionIncomplete(message)
         except OSError as e:
             message = 'Script {0} failed: {1}'.format(script, str(e))
-            logger.critical(message)
+            LOG.critical(message)
             raise exceptions.DAOProvisionIncomplete(message)
-        logger.info('Success running script for server %s (iDrac: %s)',
-                    self.server.name, idrac_ip)
+        LOG.info('Success running script for server %s (iDrac: %s)',
+                 self.server.name, idrac_ip)
 
 
 class SMValidation(PreValidationBase):

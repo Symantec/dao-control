@@ -24,7 +24,7 @@ opts = [config.StrOpt('worker', 'hook',
 
 config.register(opts)
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class HookBase(object):

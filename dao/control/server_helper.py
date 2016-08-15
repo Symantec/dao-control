@@ -84,9 +84,10 @@ def network_build_patched(rack, server):
     :return: list
     """
     # The base iface order is what validation image has.
-    f_key = lambda x: ['phys', 'bond', 'symlink', 'tagged'].index(x[1]['type'])
+    def f_key(x):
+        return ['phys', 'bond', 'symlink', 'tagged'].index(x[1]['type'])
     # If map for os family doesn't exist, use 1 to 1
-    #get initial network
+    # Get initial network
     build_net = network_build(rack, server)
     # Append physical interfaces used for bond/vlan
     phys = dict((name, dict(name=name,
@@ -108,7 +109,8 @@ def net2vlan():
 def mac_get(network_map, vlan_tag, server):
     # Array to prevent looping
     passed = []
-    _net_map = [i for i in network_map.values() if i.get('vlan') == vlan_tag][0]
+    _net_map = [i for i in network_map.values()
+                if i.get('vlan') == vlan_tag][0]
     while True:
         _nested_iface = _net_map['interfaces'][0]
         # Check looping
@@ -128,17 +130,18 @@ def generate_network(dhcp, rack, server, nets):
         return dhcp.allocate(rack, _net, server.asset.serial,
                              mac_get(network, _net.vlan_tag, server))
 
+    def net_item(vlan):
+        return (_vlan2net[vlan], dict(ip=vlan2ip[vlan][0],
+                                      mask=vlan2ip[vlan][1],
+                                      gw=vlan2ip[vlan][2],
+                                      vlan=vlan))
+
     network = rack.network_map.network_map
     _vlan2net = vlan2net()
     tags = [i['vlan'] for i in network.values() if 'vlan' in i]
 
     vlan2ip = dict((net.vlan_tag, (_get_ip(net), net.mask, net.gateway))
                    for net in nets if net.vlan_tag in tags)
-
-    net_item = lambda vlan: (_vlan2net[vlan], dict(ip=vlan2ip[vlan][0],
-                                                   mask=vlan2ip[vlan][1],
-                                                   gw=vlan2ip[vlan][2],
-                                                   vlan=vlan))
     return dict(net_item(v['vlan']) for v in network.values() if 'vlan' in v)
 
 

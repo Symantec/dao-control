@@ -69,7 +69,7 @@ class DaoBase(KeyMixin,
                 try:
                     field = getattr(self, k)
                     if v.backref:
-                        #to avoid recursion skip references with backref
+                        # To avoid recursion skip references with backref
                         continue
                     if field is None:
                         result[k] = None
@@ -131,7 +131,7 @@ class NetworkMap(Base):
 
     @property
     def network_map(self):
-        #test if it is possible to have it as json natively. For YiDB not.
+        # Test if it is possible to have it as json natively. For YiDB: not.
         return json.loads(self.network)
 
 
@@ -266,6 +266,7 @@ class NetworkDevice(Base):
     asset_id = Column(Integer, ForeignKey('asset.id'), nullable=True)
     asset = relationship(Asset, foreign_keys=asset_id,
                          primaryjoin=asset_id == Asset.id)
+
     @property
     def rack_name(self):
         return self.asset.rack.name

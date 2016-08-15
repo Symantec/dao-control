@@ -181,7 +181,6 @@ class Driver(object):
         location = location or CONF.common.location
         return model_query(models.Sku).filter_by(location=location).all()
 
-
     @staticmethod
     def cluster_get(name):
         """ Request Cluster object by name

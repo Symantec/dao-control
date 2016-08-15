@@ -37,7 +37,7 @@ opts = [
 config.register(opts)
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class SaltDriver(driver.DummyDriver):
@@ -86,12 +86,12 @@ class SaltDriver(driver.DummyDriver):
             command = 'salt-key -qyd %s' % server.fqdn
             master_minion = CONF.salt.master_minion_id
             ret = self.execute(master_minion, command)
-            logger.info(ret)
+            LOG.info(ret)
             if master_minion not in ret:
-                logger.warning('Failing to remove certificate. '
-                               'Master minion not found.')
+                LOG.warning('Failing to remove certificate. '
+                            'Master minion not found.')
         except Exception, exc:
-            logger.warning('Exception while host recreate: %s' % repr(exc))
+            LOG.warning('Exception while host recreate: %s' % repr(exc))
         return
 
     def execute(self, fqdn, cmd):
@@ -101,7 +101,7 @@ class SaltDriver(driver.DummyDriver):
                    'arg': cmd,
                    'timeout': timeout}
         payload.update(self.common_params)
-        logger.debug('Salt command: salt {tgt} {fun} {arg}'.format(**payload))
+        LOG.debug('Salt command: salt {tgt} {fun} {arg}'.format(**payload))
         r = requests.post(self.salt_url, data=payload, headers=self.headers)
         return self._get_result(r)
 
@@ -127,7 +127,7 @@ class SaltDriver(driver.DummyDriver):
         if roles:
             target_roles = ' or '.join('G@roles:%s' % r for r in roles)
             tgt = ' '.join([tgt, 'and',  '( %s )' % target_roles])
-        logger.info("tgt = %s, cmd = %s", tgt, cmd)
+        LOG.info("tgt = %s, cmd = %s", tgt, cmd)
 
         payload = {'tgt': tgt,
                    'fun': 'cmd.run',
@@ -143,7 +143,7 @@ class SaltDriver(driver.DummyDriver):
         if response.status_code != 200:
             msg = 'Communication problem with Salt Master at {0} ' \
                 'with parameters: {1}'.format(self.master, self.common_params)
-            logger.warning(msg)
+            LOG.warning(msg)
         data = response.json()
         # Actual salt response is under 'return' key represented as list
         result = data.get('return')

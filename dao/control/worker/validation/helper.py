@@ -22,7 +22,7 @@ from dao.control.worker.validation import validation_script
 from dao.control.worker.validation import server_info
 from dao.control.worker.validation import raid_configure
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 def is_up(server, port):
@@ -30,11 +30,11 @@ def is_up(server, port):
         ip_address = server_helper.get_net_ip(server, 'mgmt')
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((ip_address, port))
-        logger.debug('%s connected', server.fqdn)
+        LOG.debug('%s connected', server.fqdn)
         s.close()
         return True, ''
     except socket.error:
-        logger.debug('Fail to connect %s', server.fqdn)
+        LOG.debug('Fail to connect %s', server.fqdn)
         return False, 'Waiting validation agent (%s port)' % port
 
 

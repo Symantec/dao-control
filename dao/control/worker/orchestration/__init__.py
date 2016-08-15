@@ -28,11 +28,11 @@ opts = [
 config.register(opts)
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 def get_driver():
     module, obj = CONF.worker.orchestration_driver.rsplit('.', 1)
-    logger.info('Load %s from %s', obj, module)
+    LOG.info('Load %s from %s', obj, module)
     module = eventlet.import_patched(module)
     return getattr(module, obj)()

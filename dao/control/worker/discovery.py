@@ -47,7 +47,7 @@ opts = [
 
 config.register(opts)
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class Discovery(object):
@@ -102,21 +102,21 @@ class Discovery(object):
         :rtype: dao.control.db.model.Server
         """
         if CONF.worker.discovery_disabled and not force:
-            logger.debug('discovery disabled')
+            LOG.debug('discovery disabled')
             return
         ipmi_mac = str(netaddr.eui.EUI(ipmi_mac))
         if (ipmi_ip, ipmi_mac) in self._discovered:
-            logger.debug('%s already discovered', ipmi_ip)
+            LOG.debug('%s already discovered', ipmi_ip)
             return
         if ipmi_mac in self._processing:
-            logger.debug('Mac in progress')
+            LOG.debug('Mac in progress')
             return
         if ipmi_mac in self._ignored:
-            logger.debug('Mac ignored')
+            LOG.debug('Mac ignored')
             return
         # Discovery enabled and is not in progress
         self._processing.add(ipmi_mac)
-        logger.debug('Add to processing: %s', ipmi_mac)
+        LOG.debug('Add to processing: %s', ipmi_mac)
         try:
             # Check if server was discovered
             try:
@@ -126,7 +126,7 @@ class Discovery(object):
                                            format(ipmi_ip))
             except exceptions.DAONotFound:
                 if CONF.worker.discovery_log_only:
-                    logger.info('TO be discovered: %s, %s', ipmi_ip, ipmi_mac)
+                    LOG.info('TO be discovered: %s, %s', ipmi_ip, ipmi_mac)
                     self._ignored.add(ipmi_mac)
                     raise exceptions.DAOIgnore('Server to be discovered {0}'.
                                                format(ipmi_ip))
@@ -154,14 +154,14 @@ class Discovery(object):
             if asset.type == 'Server':
                 # Asset is either found or created and is the server Asset.
                 # Ensure server exists
-                logger.info('New server: %s, %s', ipmi_ip, asset.serial)
+                LOG.info('New server: %s, %s', ipmi_ip, asset.serial)
                 self._discover_server(ipmi, rack, nets, asset)
             else:
                 self._ignored.add(ipmi_mac)
         except exceptions.DAOIgnore, exc:
-            logger.debug('Asset ignored: %s', exc.message)
+            LOG.debug('Asset ignored: %s', exc.message)
         except Exception, exc:
-            logger.warning('Discovery for %s failed: %s', ipmi_ip, exc.message)
+            LOG.warning('Discovery for %s failed: %s', ipmi_ip, exc.message)
             if 'is not supported' in exc.message:
                 self._ignored.add(ipmi_mac)
             else:
@@ -176,7 +176,8 @@ class Discovery(object):
         :type ipmi_mac: str
         :type rack: dao.control.db.model.Rack
         :type nets: list of dao.control.db.model.Subnet
-        :rtype: (dao.control.db.model.Asset, dao.control.ipmi_helper.IPMIHelper)
+        :rtype: (dao.control.db.model.Asset,
+                 dao.control.ipmi_helper.IPMIHelper)
         """
         ipmi = ipmi_helper.IPMIHelper.get_backend(ipmi_ip)
         serial = ipmi.serial
@@ -186,7 +187,7 @@ class Discovery(object):
             if asset.mac and asset.mac != ipmi_mac:
                 msg = ('MAC mismatch for ip:{0}, mac:{1}, serial: {2}'.
                        format(ipmi_ip, ipmi_mac, asset.serial))
-                logger.warning(msg)
+                LOG.warning(msg)
                 raise exceptions.DAOIgnore(msg)
             if asset.ip != ipmi_ip:
                 asset.ip = ipmi_ip
@@ -201,7 +202,7 @@ class Discovery(object):
                                            format(asset.serial))
         except exceptions.DAONotFound:
             self.dhcp.allocate(rack, ipmi_net, serial, ipmi_mac, ipmi_ip)
-            logger.info('Create asset for %s', ipmi_mac)
+            LOG.info('Create asset for %s', ipmi_mac)
             asset = self.db.asset_create(rack,
                                          mac=ipmi_mac,
                                          ip=ipmi_ip,
@@ -239,7 +240,7 @@ class Discovery(object):
                       chassis_serial=ipmi.chassis_serial)
         server = self.db.server_create(self._spare_cluster,
                                        asset, **server)
-        logger.debug('Discovery: Server discovered: {0}'.format(
+        LOG.debug('Discovery: Server discovered: {0}'.format(
             pprint.pformat(server)))
         if CONF.worker.discovery_post_validation:
             server.lock_id = uuid.uuid4().get_hex()

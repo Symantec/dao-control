@@ -31,7 +31,7 @@ sql_opts = [
     cfg.StrOpt('db', 'sql_connection',
                default='sqlite:///' +
                        os.path.abspath(os.path.join(os.path.dirname(__file__),
-                       '../', '$sqlite_db')),
+                                                    '../', '$sqlite_db')),
                help='The SQLAlchemy connection string used to connect to the '
                     'database'),
     cfg.StrOpt('db', 'sqlite_db',
@@ -239,4 +239,3 @@ def get_session(autocommit=True, expire_on_commit=False):
 
     session = _MAKER()
     return session
-

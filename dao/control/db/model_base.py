@@ -146,4 +146,3 @@ class JSONEncodedDict(JsonEncodedType):
 class JSONEncodedList(JsonEncodedType):
     """Represents list serialized as json-encoded string in db."""
     type = list
-

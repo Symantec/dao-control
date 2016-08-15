@@ -25,7 +25,7 @@ opts = [config.StrOpt('worker', 'provision_driver',
 config.register(opts)
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 def get_driver(worker_url=None):
@@ -33,6 +33,6 @@ def get_driver(worker_url=None):
     :rtype: dao.control.worker.provisioning.foreman.ForemanDriver
     """
     module, obj = CONF.worker.provision_driver.rsplit('.', 1)
-    logger.info('Load %s from %s', obj, module)
+    LOG.info('Load %s from %s', obj, module)
     module = eventlet.import_patched(module)
     return getattr(module, obj)(worker_url)

@@ -24,7 +24,7 @@ opts = [config.StrOpt('dhcp', 'driver',
 
 config.register(opts)
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class DHCPBase(object):

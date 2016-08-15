@@ -37,7 +37,7 @@ opts = [
 config.register(opts)
 CONF = config.get_config()
 
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class DNSBase(object):
@@ -95,14 +95,13 @@ class DNSTool(DNSBase):
                    '--type', 'A,PTR',
                    '--value', ip,
                    '--ttl', '3600']
-        logger.debug('Running: %s', ' '.join(command))
+        LOG.debug('Running: %s', ' '.join(command))
         try:
             utils.run_sh(command)
-            logger.info('DNS record {0} added for IP {1}'.format(fqdn, ip))
+            LOG.info('DNS record %s added for IP %s', fqdn, ip)
         except exceptions.DAOExecError, exc:
-            logger.info('Failed to add DNS record {0} for IP {1}.'
-                        ' Return code: {2}'.format(fqdn, ip, exc.return_code))
-
+            LOG.info('Failed to add DNS record %s for IP %s. '
+                     'Return code: %s', fqdn, ip, exc.return_code)
 
     @staticmethod
     def _get_nets(server):
@@ -126,11 +125,11 @@ class DNSTool(DNSBase):
                    '--fqdn', fqdn,
                    '--type', 'A,PTR',
                    '--value', ip]
-        logger.debug('Running: %s', ' '.join(command))
+        LOG.debug('Running: %s', ' '.join(command))
         try:
             utils.run_sh(command)
-            logger.info('DNS record {0} for IP {1} deleted'.format(fqdn, ip))
+            LOG.info('DNS record %s for IP %s deleted', fqdn, ip)
         except exceptions.DAOExecError, exc:
-            msg = 'Failed to delete DNS record {0} for IP {1}: ' \
-                'returned code {2}'.format(fqdn, ip, exc.return_code)
-            logger.warning(msg)
+            msg = ('Failed to delete DNS record {0} for IP {1}: '
+                   'returned code {2}').format(fqdn, ip, exc.return_code)
+            LOG.warning(msg)

@@ -51,7 +51,7 @@ opts = [config.StrOpt('switchconf', 'switch_user',
 
 config.register(opts)
 CONF = config.get_config()
-logger = log.getLogger(__name__)
+LOG = log.getLogger(__name__)
 
 
 class SwitchConf(base.Base):
@@ -98,7 +98,6 @@ class SwitchConf(base.Base):
             if mgr_pool:
                 mgr_pool.cleanup()
 
-
     @dao_utils.Synchronized('switchconf.SwitchConf.switch_validate_for_server')
     def switch_validate_for_server(self, rack, server):
         if not CONF.switchconf.enabled:
@@ -112,7 +111,7 @@ class SwitchConf(base.Base):
                 raise exceptions.DAOException(
                     self._format_switch_errors(errors))
         except Exception, exc:
-            logger.warning(traceback.format_exc())
+            LOG.warning(traceback.format_exc())
             raise exceptions.DAOException(
                 'Failed to validate switch configuration: {0}'.
                 format(repr(exc)))
@@ -146,7 +145,7 @@ class SwitchConf(base.Base):
                 else:
                     message = 'Ok'
         except Exception, exc:
-            logger.warning(traceback.format_exc())
+            LOG.warning(traceback.format_exc())
             status = 'ValidatedWithErrors'
             message = 'Failed to validate switch configuration. %s'
             message %= exc.message
@@ -178,8 +177,8 @@ class SwitchConf(base.Base):
                 switch_msg = error.get(
                     '_message', 'No message').format(**error)
             except Exception:
-                logger.warning('Failed to format %s', repr(error))
-                logger.warning(traceback.format_exc())
+                LOG.warning('Failed to format %s', repr(error))
+                LOG.warning(traceback.format_exc())
                 switch_msg = 'Error formatting message, see worker log.'
 
             # Add message with additional info to change notice
@@ -203,7 +202,6 @@ class SwitchConf(base.Base):
         finally:
             if switch_mgr_pool is not None:
                 switch_mgr_pool.cleanup()
-
 
     @staticmethod
     def _prepare_validator(rack):
